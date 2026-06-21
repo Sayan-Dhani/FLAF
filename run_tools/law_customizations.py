@@ -48,6 +48,12 @@ class Task(law.Task):
     period = luigi.Parameter()
     customisations = luigi.Parameter(default="")
     test = luigi.IntParameter(default=-1)
+    n_files = luigi.IntParameter(
+        default=-1,
+        description="Quick mode: process only the first N whole files per *MC* dataset "
+        "(data is always processed in full to keep the data/MC normalization consistent). "
+        "-1 = all files. Preserves the data/MC shape; only the MC statistical uncertainty grows.",
+    )
     dataset = luigi.Parameter(default="")
     process = luigi.Parameter(default="")
     model = luigi.Parameter(default="")

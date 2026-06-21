@@ -94,16 +94,19 @@ class InputFileTask(Task, law.LocalWorkflow):
     input_file_cache = {}
 
     @staticmethod
-    def load_input_files(input_file_list, test=False):
+    def load_input_files(input_file_list, test=False, n_files=-1):
         if input_file_list not in InputFileTask.input_file_cache:
             with open(input_file_list, "r") as f:
                 input_files = json.load(f)["input_files"]
             InputFileTask.input_file_cache[input_file_list] = input_files
         input_files = InputFileTask.input_file_cache[input_file_list]
-        active_files = (
-            [input_files[0]] if test and len(input_files) > 0 else input_files
-        )
-        return active_files
+        if test and len(input_files) > 0:
+            # smoke-test mode: a single file per dataset
+            return input_files[:1]
+        if n_files and n_files > 0:
+            # quick mode: first N whole files (no within-file event cut)
+            return input_files[:n_files]
+        return input_files
 
     WF = None
     WF_complete_ = False
@@ -160,8 +163,14 @@ class AnaTupleFileTask(Task, HTCondorWorkflow, law.LocalWorkflow):
             input_file_list = (
                 InputFileTask.req(self, branch=dataset_id, branches=()).output().abspath
             )
+            # Quick mode (n_files): limit MC to the first N whole files, but always
+            # keep ALL data files. Data is not lumi-scaled, so dropping data files
+            # would break the data/MC normalization; MC stays normalized to full lumi
+            # regardless of how many files are processed (the denominator scales with them).
+            is_data = self.datasets[dataset_name]["process_group"] == "data"
+            dataset_n_files = -1 if is_data else self.n_files
             input_files = InputFileTask.load_input_files(
-                input_file_list, test=self.test > 0
+                input_file_list, test=self.test > 0, n_files=dataset_n_files
             )
 
             for input_file_idx, input_file in enumerate(input_files):
